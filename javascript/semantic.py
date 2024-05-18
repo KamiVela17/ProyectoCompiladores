@@ -7,7 +7,6 @@ def analyze(tree, names):
         value = analyze(tree[2], names)
         names[name] = value
     elif tree[0] == 'function_declaration':
-        # Para un análisis más avanzado, necesitaríamos gestionar el ámbito de las funciones
         pass
     elif tree[0] == 'return_statement':
         return analyze(tree[1], names)
