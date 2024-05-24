@@ -237,5 +237,5 @@ def run_tests(input_string):
         ast_representation = "No valid AST generated or parser error."
 
     # Concatena los resultados en un solo string
-    final_results = f"Lexer Output:\n{lexer_results}\n\nParser Output:\n{parser_results}\n\nAST Representation:\n{ast_representation}"
+    final_results = f"Lexer Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
     return final_results

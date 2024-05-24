@@ -1,233 +1,214 @@
-import ply.yacc as yacc
-from .lexico import tokens, lexer
-from .semantic import *
-# Funciones de parsing que construyen el árbol semántico
+from .node import *
+from .lexer import Lexer
 
-# Modificación en p_program
-def p_program(p):
-    'program : statements'
-    p[0] = p[1]
 
-# Modificación en p_statements
-def p_statements(p):
-    '''
-    statements : statement
-               | statement statements
-    '''
-    if len(p) == 2:
-        p[0] = ('statements', [p[1]])  
-    else:
-        p[0] = ('statements', [p[1]] + p[2])
-
-def p_statement(p):
-    '''
-    statement : function_definition
-              | assignment_statement
-              | expression_statement
-              | return_statement
-    '''
-    p[0] = p[1]
-
-def p_function_definition(p):
-    'function_definition : DEF IDENTIFIER LPAREN opt_parameter_list RPAREN COLON block'
-    check_function_defined(p[2])
-    add_function_to_context(p[2], p[4])
-    p[0] = ('function_definition', p[2], p[4], p[7])
+class Parser(object):
     
-def p_return_statement(p):
-    'return_statement : RETURN expression SEMICOLON'
-    p[0] = ('return_statement', p[2])
+    tokens = Lexer.tokens
 
-# Modificación en p_block
-def p_block(p):
-    '''
-    block : LBRACE statements RBRACE
-          | statement
-    '''
-    if len(p) == 4:
-        p[0] = ('block', p[2])
-    else:
-        p[0] = ('block', [p[1]])
+    precedence = (
+        ('nonassoc', 'LT', 'GT', 'LTE', 'GTE'),
+        ('left', 'PLUS', 'MINUS'),
+        ('left', 'TIMES', 'DIVIDE')
+    )
 
+    def p_program(p):
+        """program : stmt_list"""
+        p[0] = Module(p[1])
 
-def p_opt_parameter_list(p):
-    '''
-    opt_parameter_list : parameter_list
-                       | empty
-    '''
-    p[0] = p[1]
-
-def p_parameter_list(p):
-    '''
-    parameter_list : IDENTIFIER
-                   | IDENTIFIER COMMA parameter_list
-    '''
-    if len(p) == 2:
-        p[0] = [p[1]]
-    else:
-        p[0] = [p[1]] + p[3]
-
-def p_assignment_statement(p):
-    'assignment_statement : IDENTIFIER EQUALS expression SEMICOLON'
-    check_assignment_to_function(p[1])
-    add_variable_to_context(p[1], p[3])
-    p[0] = ('assignment_statement', p[1], p[3])
-
-def p_expression_statement(p):
-    'expression_statement : expression SEMICOLON'
-    p[0] = ('expression_statement', p[1])
-
-def p_expression(p):
-    '''
-    expression : term
-               | expression PLUS term
-               | expression MINUS term
-               | IDENTIFIER LPAREN opt_argument_list RPAREN
-    '''
-    if len(p) == 2:
-        p[0] = p[1]
-    elif len(p) == 4:
-        p[0] = ('operation', p[2], p[1], p[3])
-    elif len(p) == 5:  # Para la llamada a función
-        check_function_exists(p[1])
-        p[0] = ('function_call', p[1], p[3])
-
-# Dentro del archivo parser.py
-
-# Lista de argumentos (opcional): puede haber cero o más argumentos
-def p_opt_argument_list(p):
-    '''
-    opt_argument_list : argument_list
-                      | empty
-    '''
-    p[0] = p[1]
-
-# Lista de argumentos: expresiones separadas por comas
-def p_argument_list(p):
-    '''
-    argument_list : expression
-                  | expression COMMA argument_list
-    '''
-    if len(p) == 2:  # Un solo argumento
-        p[0] = [p[1]]
-    else:  # Múltiples argumentos
-        p[0] = [p[1]] + p[3]
-
-    
-
-def p_term(p):
-    '''
-    term : factor
-         | term TIMES factor
-         | term DIVIDE factor
-    '''
-    if len(p) == 2:
-        p[0] = p[1]
-    else:
-        p[0] = ('operation', p[2], p[1], p[3])
-
-# ... (otras reglas)
-
-# Eliminamos la definición de NEWLINE del lexer
-
-# Agregamos FLOAT y STRING a p_factor
-def p_factor(p):
-    '''
-    factor : NUMBER
-           | float_literal
-           | string_literal
-           | IDENTIFIER
-           | LPAREN expression RPAREN
-    '''
-    if len(p) == 2:
-        if p.slice[1].type == 'NUMBER':
-            p[0] = ('number', int(p[1]))
-        elif p.slice[1].type == 'FLOAT':  # Manejo de FLOAT
-            p[0] = ('float', float(p[1]))
-        elif p.slice[1].type == 'STRING':  # Manejo de STRING
-            p[0] = ('string', p[1][1:-1])  # Quitamos las comillas
+    def p_stmt_list(p):
+        """stmt_list : stmt_list stmt
+                    | stmt
+        """
+        if len(p) == 2:
+            p[0] = StatementList()
+            p[0].add_statement(p[1])
         else:
-            p[0] = p[1]  
-    else:
-        p[0] = p[2]
-          
-# Para FLOAT
-def p_float_literal(p):
-    'float_literal : FLOAT'
-    p[0] = ('float_literal', float(p[1]))  # Convierte el token a un número flotante
+            p[1].add_statement(p[2])
+            p[0] = p[1]
 
-# Para NEWLINE (se puede ignorar)
-def p_newline(p):
-    'newline : NEWLINE'
-    p[0] = None  # No hacer nada con los saltos de línea
+    # stmt: simple_stmt | compound_stmt
+    def p_stmt(p):
+        """stmt : simple_stmt
+                | compound_stmt
+        """
+        p[0] = p[1]
 
-# Para STRING
-def p_string_literal(p):
-    'string_literal : STRING'
-    p[0] = ('string_literal', p[1][1:-1])  # Quita las comillas del string
+    # compound_stmt: if_stmt | while_stmt | for_stmt | try_stmt | with_stmt | funcdef | classdef | decorated | async_stmt
+    def p_compound_stmt(p):
+        """compound_stmt : if_stmt
+                        | while_stmt
+                        | print
+        """
+        p[0] = p[1]
 
+    # simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
+    def p_simple_stmt(p):
+        """simple_stmt : small_stmt SEMICOLON
+        """
+        p[0] = p[1]
 
-def p_empty(p):
-    'empty :'
-    p[0] = None
+    # small_stmt: (expr_stmt | del_stmt | pass_stmt | flow_stmt |
+    #             import_stmt | global_stmt | nonlocal_stmt | assert_stmt)
+    def p_small_stmt(p):
+        """small_stmt : test
+                    | flow_stmt
+        """
+        p[0] = p[1]
 
-def p_error(p):
-    if p:
-        print(f"Syntax error at token {p.type}, value '{p.value}' at line {p.lineno}")
-    else:
-        print("Syntax error at EOF")
-        
-import ply.lex as lex
-import ply.yacc as yacc
+    def p_print(p):
+        """print : PRINT LPAREN small_stmt RPAREN SEMICOLON"""
+        p[0] = Print(p[3])
 
-# Suponemos que lexer y parser están definidos y configurados aquí
+    # flow_stmt: break_stmt | continue_stmt | return_stmt | raise_stmt | yield_stmt
+    def p_flow_stmt(p):
+        """flow_stmt : RETURN
+                    | BREAK
+                    | CONTINUE
+        """
+        p[0] = p[1]
 
-parser = yacc.yacc()
+    # while_stmt: 'while' test ':' suite ['else' ':' suite]
+    def p_while_stmt(p):
+        """while_stmt : WHILE test COLON suite
+                    | WHILE test COLON suite ELSE COLON suite
+        """
+        if len(p) == 5:
+            p[0] = While(p[2], p[4], [])
+        else:
+            p[0] = While(p[2], p[4], p[7])
 
-def test_lexer(input_string):
-    """ Ejecuta el lexer sobre el string de entrada y recopila los tokens generados. """
-    lexer.input(input_string)
-    tokens = []
-    for tok in lexer:
-        token_info = f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}"
-        tokens.append(token_info)
-    return '\n'.join(tokens)
+    # if_stmt: 'if' test ':' suite ('elif' test ':' suite)* ['else' ':' suite]
+    def p_if_stmt(p):
+        """if_stmt : IF test COLON suite
+                    | IF test COLON suite ELSE COLON suite
+        """
+        if len(p) == 5:
+            p[0] = If(p[2], p[4], [])
+        else:
+            p[0] = If(p[2], p[4], p[7])
 
-def test_parser(input_string):
-    """ Ejecuta el parser sobre el string de entrada y retorna el resultado del análisis sintáctico. """
-    result = parser.parse(input_string, lexer=lexer)
-    return result
+    def p_suite(p):
+        """suite : simple_stmt
+                | LBRACK stmt_list RBRACK
+        """
+        if len(p) == 2:
+            p[0] = p[1]
+        else:
+            p[0] = p[2]
 
-def print_ast(node, level=0):
-    """ Construye una representación en cadena del AST con sangría para mostrar la estructura. """
-    result = ""
-    indent = "  " * level
-    
-    if isinstance(node, tuple):
-        result += f"{indent}{node[0]}\n"  # Agrega el tipo de nodo
-        for child in node[1:]:
-            result += print_ast(child, level + 1)
-    elif isinstance(node, list):
-        for child in node:
-            result += print_ast(child, level)
-    else:
-        result += f"{indent}- {node}\n"
-    return result
+    # or_test: and_test ('or' and_test)*
+    # and_test: not_test ('and' not_test)*
+    def p_test(p):
+        """test : comparison OR test
+                | comparison AND test
+                | comparison
+        """
+        if len(p) == 4:
+            p[0] = BoolOp(p[2], p[1], p[3])
+        else:
+            p[0] = p[1]
 
-def run_tests(input_string):
-    """ Ejecuta las pruebas del lexer, parser y muestra el AST, consolidando todo en un único string de salida. """
-    results = []
-    results.append("-------------- Testing Lexer --------------\n")
-    lexer_results = test_lexer(input_string)
-    results.append(lexer_results)
+    # comparison: expr(comp_op expr) *
+    def p_comparison(p):
+        """comparison : expr GT expr
+                    | expr LT expr
+                    | expr GTE expr
+                    | expr LTE expr
+                    | expr EQ expr
+                    | expr NEQ expr
+                    | expr
+        """
+        if len(p) == 4:
+            p[0] = Compare(p[1], p[2], p[3])
+        else:
+            p[0] = p[1]
 
-    results.append("\n-------------- Testing Parser --------------\n")
-    parser_result = test_parser(input_string)
-    if parser_result:
-        results.append("\n-------------- AST Representation --------------\n")
-        ast_representation = print_ast(parser_result)
-        results.append(ast_representation)
-    else:
-        results.append("No valid AST generated or parser error.\n")
+    def p_assign_expr(p):
+        """expr : NAME ASSIGN expr"""
+        p[0] = Assign(p[1], p[3])
 
-    return '\n'.join(results)
+    # arith_expr: term (('+'|'-') term)*
+    # term: factor (('*'|'@'|'/'|'%'|'//') factor)*
+    def p_expr(p):
+        """expr : expr PLUS expr
+                | expr MINUS expr
+                | expr TIMES expr
+                | expr DIVIDE expr
+                | expr MOD expr
+                | factor
+        """
+        if len(p) == 4:
+            p[0] = BinOp(p[1], p[2], p[3])
+        else:
+            p[0] = p[1]
+
+    # factor: ('+'|'-'|'~') factor | power
+    def p_factor(p):
+        """factor : PLUS factor
+                | MINUS factor
+                | atom_expr"""
+        if len(p) == 2:
+            p[0] = p[1]
+
+    # atom_expr: [AWAIT] atom trailer*
+    def p_atom_expr(p):
+        """atom_expr : atom"""
+        p[0] = p[1]
+
+    # atom: ('(' [yield_expr|testlist_comp] ')' |
+    #        '[' [testlist_comp] ']' |
+    #        NAME | NUMBER | STRING+ | '...' | 'None' | 'True' | 'False')
+    def p_atom(p):
+        """atom : LPAREN list_expr RPAREN
+                | LSQBRACK list_expr RSQBRACK
+                | name
+                | number
+                | string
+                | TRUE
+                | FALSE
+                | NONE
+        """
+        if len(p) == 2:
+            if isinstance(p[1], Number) or isinstance(p[1], Str) or isinstance(p[1], Name):
+                p[0] = p[1]
+            else:
+                p[0] = Const(p[1])
+        elif p[1] == '(':
+            p[0] = Tuple(p[2])
+        elif p[1] == '[':
+            p[0] = List(p[2])
+        else:
+            p[0] = p[1]
+
+    # testlist_comp: (test|star_expr) ( comp_for | (',' (test|star_expr))* [','] )
+    def p_list_expr(p):
+        """list_expr : list_expr COMMA atom_expr
+                    | atom_expr
+        """
+        if len(p) == 2:
+            p[0] = ExprList()
+            p[0].add_expr_list(p[1])
+        else:
+            p[1].add_expr_list(p[3])
+            p[0] = p[1]
+
+    def p_name(p):
+        """name : NAME"""
+        p[0] = Name(p[1])
+
+    def p_number(p):
+        """number : INT
+                | FLOAT
+        """
+        p[0] = Number(p[1])
+
+    def p_string(p):
+        """string : STRING"""
+        p[0] = Str(p[1])
+
+    def p_error(p):
+        if p:
+            print("Syntax error at {} in line {}, type {}".format(p.value, p.lineno, p.type))
+        else:
+            print("Syntax error at EOF")
