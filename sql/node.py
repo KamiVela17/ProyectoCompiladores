@@ -13,6 +13,7 @@ class Node:
         self._children.append(node)
 
     def print_node(self, prefix):
-        print('  ' * prefix, '+', self._data)
+        result = '  ' * prefix + '+' + str(self._data) + '\n'
         for child in self._children:
-            child.print_node(prefix + 1)
+            result += child.print_node(prefix + 1)
+        return result

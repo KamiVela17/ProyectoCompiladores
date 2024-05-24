@@ -1,6 +1,5 @@
 import ply.yacc as yacc
-# Get the token map from the lexer. This is required.
-from lexico import tokens, lexer
+from .lexico import tokens, lexer
 
 TEST_ERROR = 1
 
@@ -308,17 +307,58 @@ def p_error(p):
     else:
         raise Exception('Syntax', 'Error')
 
-# ------------------------------------------------------------------------------
-def uParser(data):
-    result = parser.parse(data, lexer=lexer)
-    print(result)
+# Suponemos que lexer y parser están definidos y configurados aquí
 
-# Build the parser
 parser = yacc.yacc()
-# ------------------------------------------------------------------------------
 
-if __name__ == '__main__':
-    f = open('pascal_6.pas', 'r')
-    data = f.read()
-    f.close()
-    uParser(data)
+def test_lexer(data):
+    """ Ejecuta el lexer y retorna la lista de tokens generados a partir del string de entrada como string. """
+    lexer.input(data)
+    tokens = []
+    for tok in lexer:
+        tokens.append(f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}")
+    return '\n'.join(tokens)
+
+def test_parser(data):
+    """ Ejecuta el parser sobre los datos y retorna el resultado del análisis sintáctico como string. """
+    result = parser.parse(data, lexer=lexer)
+    return str(result) if result else "No valid AST generated."
+
+def print_ast(node, level=0):
+    """ Construye y retorna una representación en cadena del AST con sangría para mostrar la estructura. """
+    indent = "  " * level
+    result = ""
+    
+    if isinstance(node, dict):
+        node_type = node.get('type', 'Unknown')
+        node_info = node.get('info', 'None')
+        result += f"{indent}{node_type} (Info: {node_info})\n"
+        children = node.get('children', [])
+        for child in children:
+            result += print_ast(child, level + 1)
+    elif isinstance(node, list):
+        for child in node:
+            result += print_ast(child, level)
+    else:
+        result += f"{indent}- {node}\n"
+    return result
+
+def run_tests(data):
+    """ Ejecuta tests para lexer y parser, e imprime los resultados incluyendo la representación del AST si está disponible. """
+    results = []
+    results.append("----- Testing Lexer -----\n")
+    lexer_results = test_lexer(data)
+    results.append(lexer_results)
+
+    results.append("\n----- Testing Parser -----\n")
+    parser_result = test_parser(data)
+    results.append(parser_result)
+
+    if parser_result != "No valid AST generated.":
+        results.append("\n----- AST Representation -----\n")
+        ast_representation = print_ast(parser_result)
+        results.append(ast_representation)
+    else:
+        results.append("\nNo valid AST generated.\n")
+
+    return '\n'.join(results)

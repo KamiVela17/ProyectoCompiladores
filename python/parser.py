@@ -1,14 +1,6 @@
 import ply.yacc as yacc
-from lexico import tokens, lexer
-import semantic  # Importamos las funciones de semantic.py
-
-# Funciones de parsing que construyen el árbol semántico
-
-# Modificación en p_program
-import ply.yacc as yacc
-from lexico import tokens, lexer
-import semantic  
-
+from .lexico import tokens, lexer
+from .semantic import *
 # Funciones de parsing que construyen el árbol semántico
 
 # Modificación en p_program
@@ -38,8 +30,8 @@ def p_statement(p):
 
 def p_function_definition(p):
     'function_definition : DEF IDENTIFIER LPAREN opt_parameter_list RPAREN COLON block'
-    semantic.check_function_defined(p[2])
-    semantic.add_function_to_context(p[2], p[4])
+    check_function_defined(p[2])
+    add_function_to_context(p[2], p[4])
     p[0] = ('function_definition', p[2], p[4], p[7])
     
 def p_return_statement(p):
@@ -77,8 +69,8 @@ def p_parameter_list(p):
 
 def p_assignment_statement(p):
     'assignment_statement : IDENTIFIER EQUALS expression SEMICOLON'
-    semantic.check_assignment_to_function(p[1])
-    semantic.add_variable_to_context(p[1], p[3])
+    check_assignment_to_function(p[1])
+    add_variable_to_context(p[1], p[3])
     p[0] = ('assignment_statement', p[1], p[3])
 
 def p_expression_statement(p):
@@ -97,7 +89,7 @@ def p_expression(p):
     elif len(p) == 4:
         p[0] = ('operation', p[2], p[1], p[3])
     elif len(p) == 5:  # Para la llamada a función
-        semantic.check_function_exists(p[1])
+        check_function_exists(p[1])
         p[0] = ('function_call', p[1], p[3])
 
 # Dentro del archivo parser.py
@@ -184,41 +176,58 @@ def p_error(p):
         print(f"Syntax error at token {p.type}, value '{p.value}' at line {p.lineno}")
     else:
         print("Syntax error at EOF")
+        
+import ply.lex as lex
+import ply.yacc as yacc
 
-# Construye el parser
+# Suponemos que lexer y parser están definidos y configurados aquí
+
 parser = yacc.yacc()
 
 def test_lexer(input_string):
+    """ Ejecuta el lexer sobre el string de entrada y recopila los tokens generados. """
     lexer.input(input_string)
+    tokens = []
     for tok in lexer:
-        print(f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}")
-        
+        token_info = f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}"
+        tokens.append(token_info)
+    return '\n'.join(tokens)
+
 def test_parser(input_string):
-    result = parser.parse(input_string)
-    print(result)
+    """ Ejecuta el parser sobre el string de entrada y retorna el resultado del análisis sintáctico. """
+    result = parser.parse(input_string, lexer=lexer)
     return result
 
-
 def print_ast(node, level=0):
-    """Imprime el AST de forma recursiva con sangría para mostrar la estructura."""
-
-    if isinstance(node, tuple):  
-        # Si es un nodo no terminal (una tupla)
-        print("  " * level + node[0])  # Imprimir tipo de nodo con sangría
+    """ Construye una representación en cadena del AST con sangría para mostrar la estructura. """
+    result = ""
+    indent = "  " * level
+    
+    if isinstance(node, tuple):
+        result += f"{indent}{node[0]}\n"  # Agrega el tipo de nodo
         for child in node[1:]:
-            print_ast(child, level + 1)  # Imprimir hijos recursivamente
-    elif isinstance(node, list): 
-        # Si es una lista de nodos
+            result += print_ast(child, level + 1)
+    elif isinstance(node, list):
         for child in node:
-            print_ast(child, level)   # Imprimir cada nodo de la lista recursivamente
+            result += print_ast(child, level)
     else:
-        # Si es un nodo hoja (un valor simple)
-        print("  " * level + f"- {node}")  # Imprimir valor con sangría
+        result += f"{indent}- {node}\n"
+    return result
 
-# Test the parser
-if __name__ == "__main__":
-    test_input = 'def metodo(x, y): return x + y;'
-    test_lexer(test_input)
-    result = test_parser(test_input)
-    print("\n--------------Árbol de Análisis Sintáctico--------------")
-    print_ast(result)
+def run_tests(input_string):
+    """ Ejecuta las pruebas del lexer, parser y muestra el AST, consolidando todo en un único string de salida. """
+    results = []
+    results.append("-------------- Testing Lexer --------------\n")
+    lexer_results = test_lexer(input_string)
+    results.append(lexer_results)
+
+    results.append("\n-------------- Testing Parser --------------\n")
+    parser_result = test_parser(input_string)
+    if parser_result:
+        results.append("\n-------------- AST Representation --------------\n")
+        ast_representation = print_ast(parser_result)
+        results.append(ast_representation)
+    else:
+        results.append("No valid AST generated or parser error.\n")
+
+    return '\n'.join(results)

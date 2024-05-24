@@ -69,6 +69,3 @@ def update_context_for_return(function_name, return_value):
         context[function_name]['return_value'] = return_value
     else:
         raise SemanticError(f"'{function_name}' is not a function or not defined.")
-
-
-

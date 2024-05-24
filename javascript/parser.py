@@ -1,7 +1,7 @@
 import ply.yacc as yacc
-from lexico import tokens, lexer
-from semantic import analyze
-
+from .lexico import tokens, lexer
+from .semantic import analyze
+import json
 # Precedencia de operadores
 precedence = (
     ('left', 'PLUS', 'MINUS'),
@@ -89,58 +89,50 @@ def p_error(p):
     else:
         print("Syntax error at EOF")
 
-# Construye el parser
+
 parser = yacc.yacc()
 
 def test_lexer(input_string):
-    print("Test lexer")
+    """ Prueba el lexer y retorna los tokens generados a partir del string de entrada como un string legible. """
     lexer.input(input_string)
+    token_descriptions = []
     for tok in lexer:
-        print(f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}")
+        token_info = f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}"
+        token_descriptions.append(token_info)
+    return '\n'.join(token_descriptions)
 
 def test_parser(input_string):
-    result = parser.parse(input_string)
+    """ Analiza el string de entrada y retorna el resultado del análisis sintáctico. """
+    result = parser.parse(input_string, lexer=lexer)
     return result
 
 def print_ast(node, level=0):
     """ Construye y retorna una representación en cadena del AST con sangría para mostrar la estructura. """
-    indent = "  " * level  # Crea una cadena de espacios para la sangría
+    indent = "  " * level
     result = ""
-
+    
     if isinstance(node, dict):
-        # Si el nodo es un diccionario (nodo no terminal)
         node_type = node.get('type', 'Unknown')
         node_info = node.get('info', 'None')
         result += f"{indent}{node_type} (Info: {node_info})\n"
         children = node.get('children', [])
         for child in children:
-            result += print_ast(child, level + 1)  # Construye la representación de los hijos recursivamente
+            result += print_ast(child, level + 1)
     elif isinstance(node, list):
-        # Si el nodo es una lista de nodos
         for child in node:
-            result += print_ast(child, level)  # Construye la representación de cada nodo de la lista recursivamente
+            result += print_ast(child, level)
     else:
-        # Si es un nodo hoja (valor simple)
-        result += f"{indent}- {node}\n"  # Agrega el valor con sangría
-    print(result)
+        result += f"{indent}- {node}\n"
     return result
 
-if __name__ == "__main__":
-    # Prueba del lexer
-    test_input = '''
-    var x = 3 + 5;
-    function foo(y) {
-        return y * 2;
-    }
-    '''
-    print("--------------Prueba del Lexer--------------")
-    test_lexer(test_input)
-    print("\n--------------Árbol de Análisis Sintáctico--------------")
-    result = test_parser(test_input)
-    ast = print_ast(result)
-    if result:
-        semantic = analyze(result, names)
-        print("\n--------------Análisis Semántico--------------")
-        print(names)
+def run_tests(input_string):
+    """ Ejecuta todas las pruebas: lexing, parsing y la impresión del AST, y retorna los resultados concatenados en un solo string. """
+    lexer_results = test_lexer(input_string)
+    parser_results = test_parser(input_string)
+    if parser_results:
+        ast_representation = print_ast(parser_results)
     else:
-        print("Error en el análisis sintáctico, no se puede proceder al análisis semántico.")
+        ast_representation = "No valid AST generated or parser error."
+    
+    final_results = f"Lexer Output:\n{lexer_results}\n\nParser Output:\n{parser_results}\n\nAST Representation:\n{ast_representation}"
+    return final_results
