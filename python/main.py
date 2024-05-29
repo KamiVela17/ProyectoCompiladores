@@ -4,6 +4,12 @@ from .interpreter import Interpreter
 from .tree_printer import TreePrinter
 import ply.yacc as yacc
 
+
+def test_lexer():
+    lexer = Lexer()
+    tokens = lexer.tokens
+    return tokens
+
 def run_tests(code):
     # Crear instancias del lexer y parser
     lexer = Lexer()
@@ -14,6 +20,8 @@ def run_tests(code):
 
     # Parsear el código y obtener el AST
     ast = parser.parse(code, lexer=lexer)
+    results.append('===== LEXER OUTPUT =====\n')
+    results.append('\n'.join(lexer.tokens)+'\n')
     results.append('===== AST =====\n')
     results.append(str(ast))
 
