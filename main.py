@@ -109,7 +109,27 @@ class Application(tk.Tk):
             resultado = f"Error durante el análisis: {e}"
         return lenguaje, resultado
 
+    def identificar_lenguaje_por_contenido(self, content):
+        # Esta función intenta identificar el lenguaje basado en el contenido del texto
+        if "SELECT" in content and "FROM" in content:
+            return "SQL", run_sql_tests
+        elif "#include" in content or "int main" in content or "void main" in content:
+            return "C++", run_cpp_tests
+        elif "<html>" in content or "<body>" in content:
+            return "HTML", run_html_tests
+        elif "function" in content or "var " in content:
+            return "JavaScript", run_js_tests
+        elif "BEGIN" in content or "END" in content:
+            return "Pascal", run_pascal_tests
+        elif "def " in content or "import " in content or "print(" in content:
+            return "Python", run_python_tests
+        else:
+            return "Lenguaje desconocido", lambda x: "No se pudo identificar el lenguaje."
 
+    def analizar_texto(self, content):
+        lenguaje, funcion = self.identificar_lenguaje_por_contenido(content)
+        resultado = funcion(content)
+        self.mostrar_resultados(lenguaje, resultado)
 
     def mostrar_resultados(self, lenguaje, resultado):
         result_window = tk.Toplevel(self)
