@@ -1,17 +1,16 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import filedialog as tkFileDialog
-from tkinter import scrolledtext as tkScrolledText
+from tkinter import filedialog as tkFileDialog, scrolledtext as tkScrolledText
 import os
 from PIL import Image, ImageTk
 
 # Importando funciones adicionales de los módulos
-from hypertext.parser import run_tests as run_html_tests, test_html_lexer as html_lexer
-from cplusplus.parser import run_tests as run_cpp_tests, test_lexer as cpp_lexer
-from javascript.parser import run_tests as run_js_tests, test_lexer as js_lexer
-from pascal.parser import run_tests as run_pascal_tests, test_lexer as pascal_lexer
-from python.main import run_tests as run_python_tests, test_lexer as python_lexer
-from sql.parser import run_tests as run_sql_tests, test_lexer as sql_lexer
+from hypertext.parser import run_html_tests
+from cplusplus.parser import run_cpp_tests
+from javascript.parser import run_js_tests
+from pascal.parser import run_pascal_tests
+from python.main import run_python_tests
+from sql.parser import run_sql_tests
 
 class Application(tk.Tk):
     def __init__(self):
@@ -22,27 +21,21 @@ class Application(tk.Tk):
         self.main_frame = tk.Frame(self, bg='#202020')
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.text_frame = tk.Frame(self.main_frame, bg='#202020')
-        self.text_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        self.input_text = tk.Text(self.text_frame, height=10, width=40)
-        self.input_text.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-
         self.right_frame = tk.Frame(self.main_frame, bg='#202020')
-        self.right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        self.right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.load_logo()
 
         self.title_label = tk.Label(self.right_frame, text="Proyecto Final", font=("Helvetica", 16, "bold"), bg='#202020', fg='white')
         self.title_label.pack(pady=(10, 10))
 
-        self.instructions_label = tk.Label(self.right_frame, text="Ingrese texto o seleccione un archivo para analizar:", font=("Helvetica", 10), bg='#202020', fg='white')
+        self.instructions_label = tk.Label(self.right_frame, text="Seleccione un archivo para analizar:", font=("Helvetica", 10), bg='#202020', fg='white')
         self.instructions_label.pack(pady=(0, 20))
 
         self.boton_analizar = ttk.Button(self.right_frame, text="Seleccionar Archivo", command=self.seleccionar_archivo_y_analizar, style='TButton')
         self.boton_analizar.pack(pady=(0, 10), ipadx=10, ipady=5)
 
-        self.boton_adivinar = ttk.Button(self.right_frame, text="Analizar Texto", command=self.adivinar_lenguaje, style='TButton')
+        self.boton_adivinar = ttk.Button(self.right_frame, text="Analizar Texto", command=self.abrir_nueva_ventana, style='TButton')
         self.boton_adivinar.pack(pady=(10, 20), ipadx=10, ipady=5)
 
         self.minsize(500, 300)
@@ -67,54 +60,60 @@ class Application(tk.Tk):
             extension = os.path.splitext(filepath)[1].lower()
             with open(filepath, 'r', encoding='utf-8') as file:
                 file_content = file.read()
-            self.analizar_contenido(extension, file_content)
+            lenguaje, resultado = self.identificar_lenguaje_por_extension(extension, file_content)
+            self.mostrar_resultados(lenguaje, resultado)
 
-    def adivinar_lenguaje(self):
-        content = self.input_text.get("1.0", tk.END)
-        extension = self.identificar_extension(content)
-        self.analizar_contenido(extension, content)
+    def abrir_nueva_ventana(self):
+        new_window = tk.Toplevel(self)
+        new_window.title("Analizar Texto")
+        new_window.configure(bg='black')
+        new_window.geometry("600x400")
 
-    def identificar_extension(self, content):
-        # Implementar una lógica simple para identificar el lenguaje
-        if "function" in content and "{" in content:
-            return '.js'
-        elif "def" in content and "import" in content:
-            return '.py'
-        elif "<html>" in content:
-            return '.html'
-        elif "#" in content and "::" in content:
-            return '.cpp'
-        return 'Desconocido'
+        container = tk.Frame(new_window, bg='black')
+        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-    def analizar_contenido(self, extension, content):
-        resultado = self.identificar_lenguaje(extension, content)
-        self.mostrar_resultados(resultado)
+        text_area = tk.Text(container, wrap=tk.WORD, font=('Courier New', 12), background='black', foreground='white', borderwidth=2, relief="solid")
+        text_area.grid(row=0, column=0, sticky="nsew")
 
-    def identificar_lenguaje(self, extension, content):
-        if extension == '.cpp':
-            resultado = run_cpp_tests(content)
-            return 'C++: ' + resultado
-        elif extension in ['.html', '.htm']:
-            resultado = run_html_tests(content)
-            return 'HTML: ' + resultado
-        elif extension == '.js':
-            resultado = run_js_tests(content)
-            return 'JavaScript: ' + resultado
-        elif extension == '.pas':
-            resultado = run_pascal_tests(content)
-            return 'Pascal: ' + resultado
-        elif extension == '.py':
-            resultado = run_python_tests(content)
-            return 'Python: ' + resultado
-        elif extension == '.sql':
-            resultado = run_sql_tests(content)
-            return 'SQL: ' + resultado
-        else:
-            return 'Lenguaje desconocido'
+        container.grid_rowconfigure(0, weight=1)
+        container.grid_columnconfigure(0, weight=1)
 
-    def mostrar_resultados(self, resultado):
+        button_frame = tk.Frame(container, bg='black')
+        button_frame.grid(row=1, column=0, sticky="ew")
+
+        analyze_button = ttk.Button(button_frame, text="Analizar", command=lambda: self.analizar_texto(text_area.get("1.0", tk.END)), style='TButton')
+        analyze_button.pack(side=tk.RIGHT, padx=10, pady=10)
+
+        clear_button = ttk.Button(button_frame, text="Limpiar Pantalla", command=lambda: text_area.delete('1.0', tk.END), style='TButton')
+        clear_button.pack(side=tk.RIGHT, padx=10, pady=10)
+
+    def identificar_lenguaje_por_extension(self, extension, content):
+        switcher = {
+            '.sql': ('SQL', run_sql_tests),
+            '.cpp': ('C++', run_cpp_tests),
+            '.html': ('HTML', run_html_tests),
+            '.htm': ('HTML', run_html_tests),
+            '.js': ('JavaScript', run_js_tests),
+            '.pas': ('Pascal', run_pascal_tests),
+            '.py': ('Python', run_python_tests)
+        }
+        try:
+            if extension in switcher:
+                lenguaje, funcion = switcher[extension]
+                resultado = funcion(content)
+            else:
+                lenguaje = 'Lenguaje desconocido'
+                resultado = 'No se pudo identificar el lenguaje.'
+        except Exception as e:
+            lenguaje = 'Error'
+            resultado = f"Error durante el análisis: {e}"
+        return lenguaje, resultado
+
+
+
+    def mostrar_resultados(self, lenguaje, resultado):
         result_window = tk.Toplevel(self)
-        result_window.title("Resultados de Análisis")
+        result_window.title(f"Resultados de Análisis - {lenguaje}")
         result_window.configure(bg='black')
         result_window.geometry("700x400")
 

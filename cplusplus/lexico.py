@@ -64,7 +64,7 @@ def t_ID(t):
 
 def t_INCLUDE(t):
     r'\#include[ \t]*(?:<|")\w+\.\w+(?:>|")'
-    t.value = re.search('(?:<|")\w+\.\w+(?:>|")', t.value).group()[1:-1]
+    t.value = re.search(r'(?:<|")\w+\.\w+(?:>|")', t.value).group()[1:-1]
     return t
 
 
@@ -93,7 +93,7 @@ def t_newline(t):
 
 
 def t_error(t):
-    print("Invalid Token:", t.value[0])
+    print("Invalid c++ character:", t.value[0])
     t.lexer.skip(1)
 
 

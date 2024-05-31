@@ -1,1 +1,1 @@
-SELECT a, b FROM c
+SELECT a, b FROM c;

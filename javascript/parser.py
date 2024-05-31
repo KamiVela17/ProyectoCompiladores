@@ -92,21 +92,20 @@ def p_error(p):
 
 parser = yacc.yacc()
 
-def test_lexer(input_string):
-    """ Prueba el lexer y retorna los tokens generados a partir del string de entrada como un string legible. """
+def test_js_lexer(input_string):
+    """Ejecuta el lexer sobre el string de entrada y recopila los valores de los tokens generados."""
     lexer.input(input_string)
-    token_descriptions = []
+    tokens = []
     for tok in lexer:
-        token_info = f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}"
-        token_descriptions.append(token_info)
-    return '\n'.join(token_descriptions)
+        tokens.append(tok.value)
+    return tokens
 
-def test_parser(input_string):
+def test_js_parser(input_string):
     """ Analiza el string de entrada y retorna el resultado del análisis sintáctico. """
     result = parser.parse(input_string, lexer=lexer)
     return result
 
-def print_ast(node, level=0):
+def print_js_ast(node, level=0):
     """ Construye y retorna una representación en cadena del AST con sangría para mostrar la estructura. """
     indent = "  " * level
     result = ""
@@ -117,22 +116,22 @@ def print_ast(node, level=0):
         result += f"{indent}{node_type} (Info: {node_info})\n"
         children = node.get('children', [])
         for child in children:
-            result += print_ast(child, level + 1)
+            result += print_js_ast(child, level + 1)
     elif isinstance(node, list):
         for child in node:
-            result += print_ast(child, level)
+            result += print_js_ast(child, level)
     else:
         result += f"{indent}- {node}\n"
     return result
 
-def run_tests(input_string):
+def run_js_tests(input_string):
     """ Ejecuta todas las pruebas: lexing, parsing y la impresión del AST, y retorna los resultados concatenados en un solo string. """
-    lexer_results = test_lexer(input_string)
-    parser_results = test_parser(input_string)
+    lexer_results = test_js_lexer(input_string)
+    parser_results = test_js_parser(input_string)
     if parser_results:
-        ast_representation = print_ast(parser_results)
+        ast_representation = print_js_ast(parser_results)
     else:
         ast_representation = "No valid AST generated or parser error."
     
-    final_results = f"Lexer Output:\n{lexer_results}\n\nParser Output:\n{parser_results}\n\nAST Representation:\n{ast_representation}"
+    final_results = f"Lexer JavaScript Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
     return final_results

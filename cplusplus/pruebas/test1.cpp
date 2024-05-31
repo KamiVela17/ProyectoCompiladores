@@ -1,1 +1,1 @@
-int main() { int x; x = 10; (1 + 2) / 2 + 3 / 5; }
+void main() { int x; x = 10; (1 + 2) / 2 + 3 / 5; }

@@ -1,1 +1,1 @@
-SELECT COUNT ( * ) FROM a WHERE b < 1 AND c > 2 ORDER BY d 
+SELECT COUNT ( * ) FROM a WHERE b < 1 AND c > 2 ORDER BY d;

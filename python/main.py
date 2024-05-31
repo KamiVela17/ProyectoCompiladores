@@ -5,12 +5,12 @@ from .tree_printer import TreePrinter
 import ply.yacc as yacc
 
 
-def test_lexer():
+def test_python_lexer():
     lexer = Lexer()
     tokens = lexer.tokens
     return tokens
 
-def run_tests(code):
+def run_python_tests(code):
     # Crear instancias del lexer y parser
     lexer = Lexer()
     parser = yacc.yacc(module=Parser)

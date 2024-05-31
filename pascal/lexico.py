@@ -1,238 +1,121 @@
-# Modulo - lex (scanner)
 import ply.lex as lex
-import re
+from .symtab import *
 
-# Reserved words
-reserved = (
-    'ARRAY', 'BEGIN', 'CASE', 'CONST', 'DIV', 'DO', 'DOWNTO','ELSE', 'END', 'FILE',
-    'FOR', 'FUNCTION', 'GOTO', 'IF', 'IN', 'LABEL', 'NIL', 'NOT', 'OF', 'PACKED',
-    'AND', 'OR', 'RECORD', 'REPEAT', 'SET', 'THEN', 'TO', 'TYPE', 'UNTIL', 'VAR',
-    'PROCEDURE', 'PROGRAM', 'WHILE', 'WITH', 'MOD',
-) # 35
+debug = False
 
-# Tokens
-tokens = reserved + (
-    # Arithmetic Operators ( +  -  *  / )
-    'PLUS', 'MINUS', 'TIMES', 'DIVIDE',
-    # Relational Operators ( :=  <  <=  >  >=  =  <> )
-    'EQUALS', 'LT', 'LE', 'GT', 'GE', 'EQ', 'NEQ',
-    # Delimeters ( (  )  [  ]  .  ,  ;  : )
-    'LPAREN', 'RPAREN', 'LBRACKET', 'RBRACKET', 'POINT', 'COMMA', 'SEMICOLON', 'COLON',
-    # Literals (integer, real, number, string, boolean, identifier)
-    'INTEGER', 'REAL', 'NUMBER', 'STRING', 'BOOLEAN', 'ID',
+keywords = (
+    'INT', 'FLOAT', 'WHILE', 'IF', 'THEN', 'ELSE', 'BEGIN', 'DO', 'END', 'PRINT', 'WRITE', 'READ', 'SKIP', 'RETURN', 'BREAK', 'AND', 'OR', 'NOT', 'FUN', 'ID',
 )
 
-# Arithmetic Operators ( +  -  *  /  % )
-t_PLUS = r'\+'
-t_MINUS = r'-'
-t_TIMES = r'\*'
-t_DIVIDE = r'/'
+tokens = keywords + (
+    'LT', 'LE', 'GT', 'GE', 'EQ', 'NE', 'MAS', 'MENOS', 'DIV', 'MUL', 'PARI', 'PARD', 'COMA', 'DPUN', 'CORI', 'CORD', 'PCOMA', 'PUN', 'ASIG', 'INUM', 'FNUM', 'STRING', 'COMEN'
+)
 
-# Relational Operators ( :=  <  <=  >  >=  =  <> )
-t_EQUALS = r':='
-t_LT = r'<'
+t_ignore = ' \t'
+
+t_LT = r'\<'
 t_LE = r'<='
-t_GT = r'>'
-t_GE = r'>='
+t_GT = r'\>'
+t_GE = r'=>'
 t_EQ = r'='
-t_NEQ = r'<>'
+t_NE = r'!='
+t_MAS = r'\+'
+t_MENOS = r'-'
+t_DIV = r'/'
+t_MUL = r'\*'
+t_PARI = r'\('
+t_PARD = r'\)'
+t_COMA = r'\,'
+t_DPUN = r':'
+t_CORI = r'\['
+t_CORD = r'\]'
+t_PCOMA = r';'
+t_PUN = r'\.'
+t_ASIG = r'\:='
 
-# Delimeters
-t_LPAREN = r'\('
-t_RPAREN = r'\)'
-t_LBRACKET = r'\['
-t_RBRACKET = r'\]'
-t_POINT = r'\.'
-t_COMMA = r','
-t_SEMICOLON = r';'
-t_COLON = r':'
 
-# Literals
-def t_INTEGER(t):
-    r'INTEGER'
-    return t
+def t_FNUM(t):
+    r'((\d*\.\d+)(E|e[\+-]?\d+)?|([1-9]\d*E|e[\+-]?\d+))'
+    try :
+        t.value = float(t.value)
+    except ValueError:
+        print ( "Numero mal formado. Error de Valor. linea %s" % t.lineno )
+    else:
+        return t
 
-def t_REAL(t):
-    r'REAL'
-    return t
+def t_INUM(t):
+    r'[0-9]+[^a-zA-Z_\-\/\+\*\;\:\)\]\,]?'
+    try :
+        t.value = int(t.value)
+    except ValueError:
+        print ( "Numero mal formado. Error de Valor. linea %s" % t.lineno )
+    else:
+        return t
 
-def t_STRING(t):
-    r'STRING'
-    return t
-
-def t_BOOLEAN(t):
-    r'BOOLEAN'
-    return t
-
-def t_NUMBER(t):
-    r'[-+]?\d*\.\d+ | \d+'
-    return t
-
-# Reserved words
-def t_ARRAY(t):
-    r'ARRAY'
-    return t
-
-def t_BEGIN(t):
-    r'BEGIN'
-    return t
-
-def t_CASE(t):
-    r'CASE'
-    return t
-
-def t_CONST(t):
-    r'CONST'
-    return t
-
-def t_DIV(t):
-    r'DIV'
-    return t
-
-def t_DO(t):
-    r'DO'
-    return t
-
-def t_DOWNTO(t):
-    r'DOWNTO'
-    return t
-
-def t_ELSE(t):
-    r'ELSE'
-    return t
-
-def t_END(t):
-    r'END'
-    return t
-
-def t_FILE(t):
-    r'FILE'
-    return t
-
-def t_FOR(t):
-    r'FOR'
-    return t
-
-def t_FUNCTION(t):
-    r'FUNCTION'
-    return t
-
-def t_GOTO(t):
-    r'GOTO'
-    return t
-
-def t_IF(t):
-    r'IF'
-    return t
-
-def t_IN(t):
-    r'IN'
-    return t
-
-def t_LABEL(t):
-    r'LABEL'
-    return t
-
-def t_NIL(t):
-    r'NIL'
-    return t
-
-def t_NOT(t):
-    r'NOT'
-    return t
-
-def t_OF(t):
-    r'OF'
-    return t
-
-def t_PACKED(t):
-    r'PACKED'
-    return t
-
-def t_PROCEDURE(t):
-    r'PROCEDURE'
-    return t
-
-def t_PROGRAM(t):
-    r'PROGRAM'
-    return t
-
-def t_RECORD(t):
-    r'RECORD'
-    return t
-
-def t_REPEAT(t):
-    r'REPEAT'
-    return t
-
-def t_SET(t):
-    r'SET'
-    return t
-
-def t_THEN(t):
-    r'THEN'
-    return t
-
-def t_TO(t):
-    r'TO'
-    return t
-
-def t_TYPE(t):
-    r'TYPE'
-    return t
-
-def t_UNTIL(t):
-    r'UNTIL'
-    return t
-
-def t_VAR(t):
-    r'VAR'
-    return t
-
-def t_WHILE(t):
-    r'WHILE'
-    return t
-
-def t_WITH(t):
-    r'WITH'
-    return t
-
-def t_MOD(t):
-    r'MOD'
-    return t
-
-def t_AND(t):
-    r'AND'
-    return t
-
-def t_OR(t):
-    r'OR'
-    return t
-
-def t_ID(t):
-    r'[A-Za-z][\w_]*'
-    if t.value.upper() in tokens:
-        t.value = t.value.upper()
-        t.type = t.value
-    return t
-#35
-
-def t_NEWLINE(t):
-    r'\n+'
-    t.lexer.lineno += t.value.count("\n")
-
-t_ignore = ' \t\x0c'
-
-# COMMENTS {* ... *}  { ... }
-def t_COMMENTS(t):
-    r'({\*(.|\n)*?\*}) | ({(.)*?})'
-    t.lexer.lineno += t.value.count('\n')
-
-# ERROR
-def t_error(t):
-    print("Illegal character: '%s'" % t.value[0])
-    print("   -> Line: '%s'" % t.lexer.lineno)
+def t_error_ID(t):
+    r'\d+[a-zA-Z_]*'
+    print ( ">>ERROR: Identificador mal formado linea %s" % t.lineno )
     t.lexer.skip(1)
 
-# Build the lexer
-lexer = lex.lex()
+def t_ID(t):
+    r'[a-zA-Z_][a-zA-Z0-9_]*'
+    if t.value.upper() in keywords:
+        t.type = t.value.upper()
+    # Agrega el ID a la tabla de simbolos
+    else: 
+        t.type = 'ID'
+        attach_symbol(t)
+    return t
+
+def is_valid_STRING(t):
+    s = str(t.value)
+    i = 0
+    #Escapes no validos.
+    s = s[1:-1] #avoid '"'
+    while s.find("\\") != -1 :
+        i = s.find("\\") + 1 #get next char after '\'
+        s = s[i:]
+        tok = str(s[:1])
+        if tok != "n" and tok != "\"" and tok != "\\":
+            print (">>ERROR Secuencia de escape de STRING no valido \\%s" % tok )
+            print (">>>> Linea %s" % t.lineno)
+            return False
+        if tok == "\\" :
+            s = s[1:]
+    return True
+
+def t_STRING(t):
+    r'\".*\"'
+    if is_valid_STRING(t) :
+        return t
+    else :
+        t.lexer.skip(1)
+
+def t_error_STRING(t):
+    r'\".*'
+    print (">>ERROR Formacion STRING incorrecta, linea: %s" % t.lineno )
+    t.lexer.skip(1)
+
+def t_COMEN(t):
+    r'/\*(.|\n|\"|\\)*?\*/'
+    return t
+
+def t_error_COMEN(t):
+    r'/\*(.|\n|\"|\\)*?'
+    print ( ">>ERROR: Comentario mal formado linea %s, linea no valida" % t.lineno )
+    t.lexer.skip(1)
+
+def t_newline(t):
+    r'\n+'
+    t.lexer.lineno += len(t.value)
+
+
+def t_error(t):
+    print(">>ERROR: Caracter no valido %s" % t.value[0])
+    print(">>>>> linea %s" %  t.lineno)
+    t.lexer.skip(1)
+
+# Build
+
+lexer = lex.lex(debug=0)
+new_scope()

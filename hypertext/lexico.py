@@ -143,7 +143,7 @@ def t_attvalue_error(t):
     t.lexer.skip(1)
 
 def t_error(t):
-    print(f"Illegal character '{t.value[0]}'")
+    print(f"Illegal html character '{t.value[0]}'")
     t.lexer.skip(1)
 
 lexer = lex.lex()

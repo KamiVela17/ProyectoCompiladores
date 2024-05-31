@@ -584,20 +584,20 @@ def p_empty(p):
 # Construye el parser global
 parser = yacc.yacc()
 
-def test_lexer(input_string):
-    """Ejecuta el lexer sobre el string de entrada y recopila los tokens generados como string."""
+def test_cpp_lexer(input_string):
+    """Ejecuta el lexer sobre el string de entrada y recopila los valores de los tokens generados."""
     lexer.input(input_string)
-    token_descriptions = []
+    tokens = []
     for tok in lexer:
-        token_descriptions.append(f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}")
-    return "\n".join(token_descriptions)
+        tokens.append(tok.value)
+    return tokens
 
-def test_parser(input_string):
+def test_cpp_parser(input_string):
     """Parsea el string de entrada y retorna el resultado del análisis sintáctico como string."""
     result = parser.parse(input_string, lexer=lexer)
     return str(result)  # Asegúrate de que el resultado pueda ser convertido a string, o modifica según la necesidad
 
-def print_ast(node, level=0):
+def print_cpp_ast(node, level=0):
     """Construye y retorna una representación en cadena del AST con sangría para mostrar la estructura."""
     result = ""
     indent = "  " * level
@@ -614,14 +614,14 @@ def print_ast(node, level=0):
     return result
 
 
-def run_tests(input_string):
+def run_cpp_tests(input_string):
     """Ejecuta todas las pruebas: lexing, parsing y la impresión del AST, y retorna los resultados concatenados."""
-    lexer_results = test_lexer(input_string)
-    parser_result = test_parser(input_string)
+    lexer_results = test_cpp_lexer(input_string)
+    parser_result = test_cpp_parser(input_string)
     if parser_result:
-        ast_representation = print_ast(parser_result)
+        ast_representation = print_cpp_ast(parser_result)
     else:
         ast_representation = "No valid AST generated or parser error."
     
-    final_results = f"Lexer Output:\n{lexer_results}\n\nParser Output:\n{parser_result}\n\nAST Representation:\n{ast_representation}"
+    final_results = f"Lexer C++ Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
     return final_results

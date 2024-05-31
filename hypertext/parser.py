@@ -137,13 +137,13 @@ def p_error(p):
 
 parser = yacc.yacc()
 
-def test_html_lexer(input_data):
-    """ Prueba el lexer de HTML y retorna los tokens generados a partir del string de entrada como un string. """
-    lexer.input(input_data)
+def test_html_lexer(input_string):
+    """Ejecuta el lexer sobre el string de entrada y recopila los valores de los tokens generados."""
+    lexer.input(input_string)
     tokens = []
     for tok in lexer:
-        tokens.append(f"type={tok.type}, value={tok.value}")
-    return '\n'.join(tokens)
+        tokens.append(tok.value)
+    return tokens
 
 def test_html_parser(input_data):
     """ Analiza el string de entrada HTML y retorna el resultado del análisis sintáctico como string. """
@@ -166,11 +166,14 @@ def print_html_ast(node, level=0):
         result += f"{indent}- {node}\n"
     return result
 
-def run_tests(input_data):
+def run_html_tests(input_data):
     """ Ejecuta todas las pruebas para HTML: lexing, parsing y la visualización del AST, y concatena los resultados en un solo string. """
     lexer_results = test_html_lexer(input_data)
-    parser_results = test_html_parser(input_data)
-    ast_representation = print_html_ast(parser_results)
+    parser_result = test_html_parser(input_data)
+    if parser_result:
+        ast_representation = print_html_ast(parser_result)
+    else:
+        ast_representation = "No valid AST generated or parser error."
     
-    final_results = f"Lexer Output:\n{lexer_results}\n\nParser Output:\n{parser_results}\n\nAST Representation:\n{ast_representation}"
+    final_results = f"Lexer HTML Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
     return final_results

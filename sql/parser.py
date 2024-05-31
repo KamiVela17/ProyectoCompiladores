@@ -1,241 +1,233 @@
-import ply.yacc as yacc
-import re
-from math import *
-from .node import Node
-from .lexico import tokens, lexer
+from .lexer import Lexer
+from .grammar import bnf
 
-# PARSING
-def p_query(t):
-    '''query : select 
-             | LP query RP
-    '''
-    if len(t) == 2:
-        t[0] = t[1]
-    else:
-        t[0] = t[2]
+class ParsingErrorException(Exception):    
+    __module__ = 'builtins'
 
-def p_select(t):
-    '''select : SELECT list FROM table WHERE lst ORDER BY list
-              | SELECT list FROM table WHERE lst
-              | SELECT list FROM table ORDER BY list
-              | SELECT list FROM table
-    '''
-    if len(t) == 10:
-        t[0] =  Node('QUERY')
-        t[0].add( Node('[SELECT]'))
-        t[0].add(t[2])
-        t[0].add( Node('[FROM]'))
-        t[0].add(t[4])
-        t[0].add( Node('[WHERE]'))
-        t[0].add(t[6])
-        t[0].add( Node('[ORDER BY]'))
-        t[0].add(t[9])
-    elif len(t) == 8:
-        t[0] =  Node('QUERY')
-        t[0].add( Node('[SELECT]'))
-        t[0].add(t[2])
-        t[0].add( Node('[FROM]'))
-        t[0].add(t[4])
-        t[0].add( Node('[ORDER BY]'))
-        t[0].add(t[7])
-    elif len(t) == 7:
-        t[0] =  Node('QUERY')
-        t[0].add( Node('[SELECT]'))
-        t[0].add(t[2])
-        t[0].add( Node('[FROM]'))
-        t[0].add(t[4])
-        t[0].add( Node('[WHERE]'))
-        t[0].add(t[6])
-    else:
-        t[0] =  Node('QUERY')
-        t[0].add( Node('[SELECT]'))
-        t[0].add(t[2])
-        t[0].add( Node('[FROM]'))
-        t[0].add(t[4])
+# ================
 
-def p_table(t):
-    '''table : NAME
-             | LP query RP
-             | NAME AS NAME
-             | table AS NAME
-             | table COMMA table
-    '''
-    if len(t) == 2:
-        t[0] =  Node('[TABLE]')
-        t[0].add( Node(t[1]))
-    elif t[2] == 'AS' and isinstance(t[1],  Node):
-        t[0] =  Node('[TABLE]')
-        t[0].add(t[1])
-        t[0].add( Node('AS'))
-        t[0].add( Node(t[3]))
-    elif t[2] == 'AS' and not isinstance(t[1],  Node):
-        t[0] =  Node('[TABLE]')
-        t[0].add( Node(t[1]))
-        t[0].add( Node('AS'))
-        t[0].add( Node(t[3]))
-    elif t[2] == ',':
-        t[0] =  Node('[TABLES]')
-        t[0].add(t[1])
-        t[0].add(t[3])
-    else:
-        t[0] =  Node('[TABLE]')
-        t[0].add(t[2])
+class Node(object):
+    def __init__(self, val):
+        self.value = val # Value of node
+        self.children = [] # Can have multiple children
 
-def p_lst(t):
-    '''lst : condition
-           | condition AND condition
-           | condition OR condition
-           | NAME BETWEEN NUMBER AND NUMBER
-           | NAME IN LP query RP
-           | NAME '<' agg
-           | NAME '>' agg
-           | agg '>' NUMBER
-           | NAME '=' agg
-           | agg '=' NUMBER
-           | agg '<' NUMBER
-    '''
-    if len(t) == 2:
-        t[0] =  Node('[CONDITION]')
-        t[0].add(t[1])
-    elif t[2] == ',':
-        t[0] =  Node('[CONDITIONS]')
-        t[0].add(t[1])
-        t[0].add(t[3])
-    elif t[2] == 'AND':
-        t[0] =  Node('[CONDITIONS]')
-        t[0].add(t[1])
-        t[0].add( Node('[AND]'))
-        t[0].add(t[3])
-    elif t[2] == 'OR':
-        t[0] =  Node('[CONDITIONS]')
-        t[0].add(t[1])
-        t[0].add( Node('[OR]'))
-        t[0].add(t[3])
-    elif t[2] == 'BETWEEN':
-        temp = '%s >= %s & %s <= %s' % (t[1], str(t[3]), t[1], str(t[5]))
-        t[0] =  Node('[CONDITION]')
-        t[0].add( Node('[TERM]'))
-        t[0].add( Node(temp))
-    elif t[2] == 'IN':
-        t[0] =  Node('[CONDITION]')
-        t[0].add( Node(t[1]))
-        t[0].add( Node('[IN]'))
-        t[0].add(t[4])
-    elif t[2] == '<' and len(t) == 4:
-        temp = '%s < %s' % (str(t[1]), str(t[3]))
-        t[0] =  Node('[CONDITION]')
-        t[0].add( Node('[TERM]'))
-        t[0].add( Node(temp))
-    elif t[2] == '=' and len(t) == 4:
-        temp = '%s = %s' % (str(t[1]), str(t[3]))
-        t[0] =  Node('[CONDITION]')
-        t[0].add( Node('[TERM]'))
-        t[0].add( Node(temp))
-    elif t[2] == '>' and len(t) == 4:
-        temp = '%s > %s' % (str(t[1]), str(t[3]))
-        t[0] =  Node('[CONDITION]')
-        t[0].add( Node('[TERM]'))
-        t[0].add( Node(temp))
-    else:
-        t[0] =  Node('')
+    def add_child(self, node):
+        self.children.append(node)
+        return node
 
-def p_condition(t):
-    '''condition : NAME '>' NUMBER
-                 | NAME '>' agg  
-                 | NAME '<' NUMBER
-                 | NAME '<' agg
-                 | NAME '=' NUMBER
-                 | NAME '=' agg
-                 | NAME '>' NAME
-                 | NAME '<' NAME
-                 | NAME '=' NAME
-                 | list '>' list
-                 | list '<' list
-                 | list '=' list
-                 | list '>' NUMBER
-                 | list '<' NUMBER
-                 | list '=' NUMBER
-    '''
-    t[0] =  Node('[TERM]')
-    if isinstance(t[1],  Node):
-        t[0].add(t[1])
-    else:
-        t[0].add( Node(str(t[1])))
-    t[0].add( Node(t[2]))
-    if isinstance(t[3],  Node):
-        t[0].add(t[3])
-    else:
-        t[0].add( Node(str(t[3])))
+def show_tree(tree):
+    """ (Level order) Traverse and print parse tree
+    """
+    queue = []
+    queue.append(tree)
+    result = []
 
-def p_agg(t):
-    '''agg : SUM LP NAME RP
-           | AVG LP NAME RP
-           | COUNT LP NAME RP
-           | MIN LP NAME RP 
-           | MAX LP NAME RP
-           | COUNT LP '*' RP
-    '''
-    t[0] = '%s(%s)' % (t[1], t[3])
+    while len(queue) != 0:
+        items = len(queue)
 
-def p_list(t):
-    '''list : '*'
-            | NAME
-            | NAME DOT NAME 
-            | list COMMA list
-            | list AND NAME
-            | list OR NAME        
-            | agg
-    '''
-    if len(t) == 2:
-        t[0] =  Node('[FIELD]')
-        t[0].add( Node(t[1]))
-    elif t[2] == ',':
-        t[0] =  Node('[FIELDS]')
-        t[0].add(t[1])
-        t[0].add(t[3])
-    else:
-        temp = '%s.%s' % (t[1], t[3])
-        t[0] =  Node('[FIELD]')
-        t[0].add( Node(temp))
+        while items > 0:
+            node = queue[0]
+            queue.pop(0)
 
-def p_error(t):
-    print("Syntax error at '%s'" % t.value)
+            kids = len(node.children)
+            if kids == 0:
+                result.append(node.value)
+            else:
+                result.append(f"<{node.value}>")
 
+            for i in range(kids):
+                queue.append(node.children[i])
+            items -= 1
+        result.append("\n")
+    return " ".join(result)
 
-parser = yacc.yacc()
+# ================
 
-def test_lexer(input_string):
-    """ Ejecuta el lexer sobre el string de entrada y recopila los tokens generados. """
-    lexer.input(input_string)
-    tokens = []
-    for tok in lexer:
-        tokens.append(f"type={tok.type}, value={tok.value}")
-    return tokens
+class Parser(object):
+    def __init__(self, input_txt):
+        self.input = input_txt
+        lexx = Lexer(self.input)
+        self.tokens = lexx.yield_token()
+        self.next_token = None
+        self.current_token = None
+        self.advance()
 
-def test_parser(input_string):
-    """ Ejecuta el parser sobre los datos y retorna el resultado del análisis sintáctico. """
-    return parser.parse(input_string, lexer=lexer)
+    def advance(self):
+        """ Advance the tokens in use
+        """
+        self.current_token, self.next_token = self.next_token, next(self.tokens, None)
 
-def print_ast(node):
-    """Construye una representación en cadena del AST con sangría para mostrar la estructura."""
-    if not node:
-        return "No valid AST generated or parser error."
-    
-    # Llama a print_node que ahora devuelve una cadena
-    return node.print_node(0)
+    def accept(self, expected, raise_err=True):
+        """ Helper function to check if the next token is what we expect
 
-def run_tests(input_string):
+        Params:
+            expected (str) - Either the exact token we expect e.g. "SELECT" or the token type we expect e.g. "name"
+            raise_err (bool) - Whether or not to raise an error and halt program
+
+        Returns:
+            (bool) - Whether the next token is what's expected
+        """
+        if self.next_token["token"] == expected or self.next_token["token_type"] == expected:
+            self.advance()
+            if self.next_token is None:
+                if self.current_token["token_type"] == "terminal":
+                    pass
+                else:
+                    raise ParsingErrorException(f"Semi-colon (;) expected at the end of the query")
+            return True
+        else:
+            if raise_err:
+                raise ParsingErrorException(f"Unexpected token {self.next_token}. Expected {expected}. Please refer to the grammar {bnf}")
+            return False
+
+    def parse(self):
+        """ Our entry point
+        """
+        self.tree = self.query()
+        return self.tree
+
+    def query(self):
+        """ <query> ::= "SELECT " <columns> " FROM " <name> <terminal> | "SELECT " <columns> " FROM " <name> " WHERE " <conditionList> <terminal>
+        """
+        self.tree = Node("Query")
+        if self.accept("SELECT"):
+            self.tree.add_child(Node("SELECT"))
+            self.cols_node = self.tree.add_child(Node("columns"))
+            if self.columns():
+                if self.accept("FROM"):
+                    self.tree.add_child(Node("FROM"))
+                    self.tbl_name_node = self.tree.add_child(Node("name"))
+                    if self.name():
+                        self.tbl_name_node.add_child(Node(self.current_token["token"]))
+                        if self.terminal(False):
+                            self.termin = self.tree.add_child(Node("terminal"))
+                            self.termin.add_child(Node(';'))
+                        elif self.accept("WHERE"):
+                            self.tree.add_child(Node("WHERE"))
+                            self.conds_node = self.tree.add_child(Node("condition_list"))
+                            if self.condition_list():
+                                if self.terminal(True):
+                                    self.termin = self.tree.add_child(Node("terminal"))
+                                    self.termin.add_child(Node(';'))
+        return self.tree
+
+    def columns(self):
+        """ <columns> ::= (<name> ", ")+ | "*"
+
+        Accepts:
+            - *
+            - col_a
+            _ col_a, col_b
+        """
+        if self.accept("all_cols", False):
+            self.all_cols = self.cols_node.add_child(Node("all_cols"))
+            self.all_cols.add_child(Node("*"))
+            return True
+        else:
+            if self.accept("name"):
+                self.a = self.cols_node.add_child(Node("name"))
+                self.a.add_child(Node(self.current_token["token"]))
+                if self.accept("punctuation", False):
+                    self.b = self.cols_node.add_child(Node("punctuation"))
+                    self.b.add_child(Node(self.current_token["token"]))
+                    self.columns()
+                else:
+                    return True
+            else:
+                return False
+            return True
+
+    def name(self, is_exp=True):
+        """ Accepts tokens of type 'name'
+        """
+        if self.accept("name", is_exp):
+            return True
+
+    def condition_list(self):
+        """ <conditionList> ::= <condition> <comparator> <condition>
+
+        Accepts:
+            - col_a = 20 
+            - col_a = 20 AND col_b = 30
+            - col_a = 20 OR col_b = col_c
+        """
+        self.a = self.conds_node.add_child(Node("condition"))
+        if self.condition():
+            if self.comparator():
+                self.b = self.conds_node.add_child(Node("comparator"))
+                self.b.add_child(Node(self.current_token["token"]))
+                self.condition_list()
+            return True
+
+    def comparator(self):
+        """ <comparator> ::= " AND " | " OR "
+
+        Accepts:
+            - AND
+            - OR
+        """
+        if self.accept("AND", False) or self.accept("OR", False):
+            return True
+
+    def condition(self):
+        """ <condition> ::= <name> <operator> <term>
+
+        Accepts:
+            - col_a = 20
+            - col_a = 20.5
+            - col_a = col_b
+        """
+        if self.name():
+            self.nm = self.a.add_child(Node("name"))
+            self.nm.add_child(Node(self.current_token["token"]))
+            if self.operator():
+                self.op = self.a.add_child(Node("operator"))
+                self.op.add_child(Node(self.current_token["token"]))
+                if self.term():
+                    self.tm = self.a.add_child(Node("term"))
+                    self.tmm = self.tm.add_child(Node(self.current_token["token_type"]))
+                    self.tmm.add_child(Node(self.current_token["token"]))
+                    return True
+
+    def term(self):
+        """ <term> ::= <digit> | <digit> "." <digit> | <name>
+        """
+        if self.accept("integer", False) or self.accept("float", False) or self.accept("name", False):
+            return True
+
+    def terminal(self, to_raise=True):
+        """ Accepts tokens of type 'terminal'
+        """
+        if self.accept("terminal", to_raise):
+            return True
+
+    def operator(self):
+        """ Accepts tokens of type 'operator'
+        """
+        if self.accept("operator"):
+            return True
+
+    def test_sql_lexer(self):
+        """ Run the lexer on the input data and return the tokens"""
+        lexx = Lexer(self.input)
+        tokens = list(lexx.yield_token())
+        return [token['token'] for token in tokens]
+
+def run_sql_tests(input_string):
     """ Ejecuta todas las pruebas: lexing, parsing y la impresión del AST, y retorna los resultados concatenados en un solo string. """
+    parser = Parser(input_string)
+
     # Realiza el análisis léxico
-    lexer_results = test_lexer(input_string)
+    lexer_results = parser.test_sql_lexer()
+    lexer_output = "[" + ", ".join(lexer_results) + "]"
+
     # Realiza el análisis sintáctico
-    parser_results = test_parser(input_string)
-    # Genera la representación AST si el parsing fue exitoso
-    if parser_results:
-        ast_representation = print_ast(parser_results)
+    parse_tree = parser.parse()
+    if parse_tree:
+        ast_representation = show_tree(parse_tree)
     else:
         ast_representation = "No valid AST generated or parser error."
 
     # Concatena los resultados en un solo string
-    final_results = f"Lexer Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
+    final_results = f"Lexer SQL Output:\n{lexer_output}\n\nAST Representation:\n{ast_representation}"
     return final_results

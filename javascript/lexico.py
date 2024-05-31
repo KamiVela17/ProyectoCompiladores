@@ -49,7 +49,7 @@ def t_newline(t):
 
 # Regla para manejar errores
 def t_error(t):
-    print(f"Illegal character '{t.value[0]}'")
+    print(f"Illegal javascript character '{t.value[0]}'")
     t.lexer.skip(1)
 
 # Construir el lexer

@@ -1,1 +1,1 @@
-SELECT a . b , c . d FROM aaa AS a , ccc AS c 
+SELECT a . b , c . d FROM aaa AS a , ccc AS c;

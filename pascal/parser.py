@@ -1,364 +1,544 @@
+# Yacc
 import ply.yacc as yacc
+import sys
 from .lexico import tokens, lexer
+from .symtab import *
+from .parsertype import *
+#  ---------------------------------------------------------------
+#  ABSTRACT SYNTAX TREE - NODE
+#  ---------------------------------------------------------------
 
-TEST_ERROR = 1
+class Node:
+	def __init__(self, name, children = None, leaf = None):
+		self.name = name
+		if children == None:
+			children = []
+		self.children = children
+		self.leaf = leaf
+	
+	def __str__(self):
+		return "<%s>" % self.name
 
-# PRECEDENCE
-precedence = (
-    # Relational Operators ( = )
-    ('right', 'EQ'),
-    # Relational Operators ( := )
-    ('right', 'EQUALS'),
-    # Relational Operators ( <> )
-    ('left', 'NEQ'),
-    # Relational Operators ( <  <=  > )
-    ('left', 'LT', 'LE', 'GT', 'GE'),
-    # Arithmetic Operators ( +  - )
-    ('left', 'PLUS', 'MINUS'),
-    # Arithmetic Operators ( *  / )
-    ('left', 'TIMES', 'DIVIDE'),
-    # Delimeters ( (  ) )
-    ('left', 'LPAREN', 'RPAREN'),
+	def __repr__(self):
+		return "<%s>" % self.name
+
+	def append(self, node):
+		self.children.append(node)
+
+#  ---------------------------------------------------------------
+#  ABSTRACT SYNTAX TREE - TYPE SYSTEM
+#  ---------------------------------------------------------------
+
+def dump_tree(node, indent=""):
+    # Lista para acumular las líneas de la representación del árbol.
+    result = []
+    _dump_tree_recursive(node, indent, result)
+    return "\n".join(result)
+
+def _dump_tree_recursive(node, indent, result):
+    if not hasattr(node, "typ"):
+        datatype = ""
+    else:
+        if node.typ == 'error':
+            datatype = node.typ
+        elif node.typ[1]:
+            datatype = str(node.typ[0]) + "_" + str(node.typ[1])
+        else:
+            datatype = node.typ[0]
+
+    try:
+        if not node.leaf:
+            result.append("%s %s  %s" % (indent, node.name, datatype))
+        else:
+            result.append("%s%s (%s)  %s" % (indent, node.name, node.leaf, datatype))
+
+        indent = indent.replace("-", " ").replace("+", " ")
+        for i, c in enumerate(node.children):
+            connector = "  +-- " if i == len(node.children) - 1 else "  |-- "
+            _dump_tree_recursive(c, indent + connector, result)
+    except AttributeError:
+        result.append('Error de atributo en el nodo: %s, tipo de dato: %s' % (node, datatype))
+
+		
+
+#  ---------------------------------------------------------------
+#  PRECEDENCIAS
+#  ---------------------------------------------------------------
+
+precedence =(
+	('left', 'OR'),
+	('left', 'AND'),
+    ('left', 'NOT'),
+    ('left', 'MAS', 'MENOS'),
+    ('left', 'MUL', 'DIV'),   
+	('right', 'ELSE'),
 )
 
-# GRAMMAR RULES
-# PROGRAM
-def p_program(p):
-    'program : PROGRAM ID SEMICOLON block POINT'
-    p[0] = ('program', p[2], p[4])
-
-# BLOCK
-def p_block(p):
-    'block : labelDecl constDecl varDecl BEGIN procDecl functDecl statement END'
-    p[0] = ('block', p[1], p[2], p[3], p[5], p[6], p[7])
-
-# LABEL
-def p_labelDecl(p):
-    'labelDecl : LABEL NUMBER SEMICOLON'
-    p[0] = ('labelDecl', p[2])
-
-def p_labelDeclEmpty(p):
-    'labelDecl : empty'
-    p[0] = None
-
-# CONST
-def p_constDeclEmpty(p):
-    'constDecl : empty'
-    p[0] = None
-
-def p_constDecl(p):
-    'constDecl : CONST constAssignmentList SEMICOLON'
-    p[0] = ('constDecl', p[2])
-
-def p_constAssignmentList_1(p):
-    'constAssignmentList : ID EQ INTEGER'
-    p[0] = [('constAssignment', p[1], p[3])]
-
-def p_constAssignmentList_2(p):
-    'constAssignmentList : ID EQ REAL'
-    p[0] = [('constAssignment', p[1], p[3])]
-
-def p_constAssignmentList_3(p):
-    'constAssignmentList : ID EQ STRING'
-    p[0] = [('constAssignment', p[1], p[3])]
-
-def p_constAssignmentList_4(p):
-    'constAssignmentList : ID EQ NUMBER'
-    p[0] = [('constAssignment', p[1], p[3])]
-
-def p_constAssignmentList_5(p):
-    'constAssignmentList : ID EQ BOOLEAN'
-    p[0] = [('constAssignment', p[1], p[3])]
-
-# TYPE
-def p_typeDefinitionEmpty(p):
-    'typeDefinition : empty'
-    p[0] = None
-
-def p_typeDefinition_1(p):
-    'typeDefinition : INTEGER'
-    p[0] = 'integer'
-
-def p_typeDefinition_2(p):
-    'typeDefinition : REAL'
-    p[0] = 'real'
-
-def p_typeDefinition_3(p):
-    'typeDefinition : STRING'
-    p[0] = 'string'
-
-def p_typeDefinition_4(p):
-    'typeDefinition : BOOLEAN'
-    p[0] = 'boolean'
-
-# VAR
-def p_varDeclEmpty(p):
-    'varDecl : empty'
-    p[0] = None
-
-def p_varDecl(p):
-    'varDecl : VAR identList COLON typeDefinition SEMICOLON identList_2'
-    p[0] = ('varDecl', p[2], p[4], p[6])
-
-def p_identList_1(p):
-    'identList : ID'
-    p[0] = [p[1]]
-
-def p_identList_2(p):
-    'identList : identList COMMA ID'
-    p[0] = p[1] + [p[3]]
-
-def p_identList_3(p):
-    'identList_2 : empty'
-    p[0] = None
-
-def p_identList_4(p):
-    'identList_2 : identList COLON typeDefinition SEMICOLON identList_2'
-    p[0] = (p[1], p[3], p[5])
-
-# PROCEDURE
-def p_procDecl1(p):
-    'procDecl : PROCEDURE ID LPAREN parameters RPAREN SEMICOLON block SEMICOLON'
-    p[0] = ('procDecl', p[2], p[4], p[7])
-
-def p_procDeclEmpty(p):
-    'procDecl : empty'
-    p[0] = None
-
-# FUNCTION
-def p_functDeclEmpty(p):
-    'functDecl : empty'
-    p[0] = None
-
-def p_functDecl1(p):
-    'functDecl : FUNCTION ID LPAREN parameters RPAREN COLON typeDefinition SEMICOLON block SEMICOLON'
-    p[0] = ('functDecl', p[2], p[4], p[7], p[9])
-
-# PARAMETERS
-def p_parametersEmpty(p):
-    'parameterList : empty'
-    p[0] = None
-
-def p_parameters(p):
-    'parameters : parameterList'
-    p[0] = p[1]
-
-def p_parameterList_1(p):
-    'parameterList : parameterList SEMICOLON parameter'
-    p[0] = p[1] + [p[3]]
-
-def p_parameterList_2(p):
-    'parameterList : parameter'
-    p[0] = [p[1]]
-
-def p_parameter_1(p):
-    'parameter : ID COLON typeDefinition'
-    p[0] = (p[1], p[3])
-
-def p_parameter_2(p):
-    'parameter : ID COMMA parameter'
-    p[0] = (p[1], p[3])
-
-def p_parameter_3(p):
-    'parameter : COLON typeDefinition'
-    p[0] = p[2]
-
-# STATEMENT
-def p_statementEmpty(p):
-    'statement : empty'
-    p[0] = None
-
-def p_statement_1(p):
-    'statement : statement ID EQUALS expression SEMICOLON'
-    p[0] = ('assignment', p[2], p[4])
-
-def p_statement_2(p):
-    'statement : BEGIN statementList END'
-    p[0] = ('begin', p[2])
-
-def p_statement_3(p):
-    'statement : statement IF condition THEN statement'
-    p[0] = ('if', p[3], p[5])
-
-def p_statement_4(p):
-    'statement : statement IF condition THEN statement ELSE statement'
-    p[0] = ('if', p[3], p[5], p[7])
-
-def p_statement_5(p):
-    'statement : WHILE condition DO statement'
-    p[0] = ('while', p[2], p[4])
-
-# STATEMENT - List
-def p_statementList_1(p):
-    'statementList : statement'
-    p[0] = [p[1]]
-
-def p_statementList_2(p):
-    'statementList : statementList SEMICOLON statement'
-    p[0] = p[1] + [p[3]]
-
-# STATEMENT - condition
-def p_condition(p):
-    'condition : expression relation expression'
-    p[0] = (p[2], p[1], p[3])
-
-# STATEMENT - relation
-def p_relation_1(p):
-    'relation : EQUALS'
-    p[0] = 'equals'
-
-def p_relation_2(p):
-    'relation : LT'
-    p[0] = 'lt'
-
-def p_relation_3(p):
-    'relation : LE'
-    p[0] = 'le'
-
-def p_relation_4(p):
-    'relation : GT'
-    p[0] = 'gt'
-
-def p_relation_5(p):
-    'relation : GE'
-    p[0] = 'ge'
-
-def p_relation_6(p):
-    'relation : EQ'
-    p[0] = 'eq'
-
-def p_relation_7(p):
-    'relation : NEQ'
-    p[0] = 'neq'
-
-# STATEMENT - expression
-def p_expression_1(p):
-    'expression : term'
-    p[0] = p[1]
-
-def p_expression_2(p):
-    'expression : addOperator term'
-    p[0] = (p[1], p[2])
-
-def p_expression_3(p):
-    'expression : expression addOperator term'
-    p[0] = (p[2], p[1], p[3])
-
-def p_addOperator_1(p):
-    'addOperator : PLUS'
-    p[0] = '+'
-
-def p_addOperator_2(p):
-    'addOperator : MINUS'
-    p[0] = '-'
-
-def p_term_1(p):
-    'term : factor'
-    p[0] = p[1]
-
-def p_term_2(p):
-    'term : term multOperator factor'
-    p[0] = (p[2], p[1], p[3])
-
-def p_multOperator_1(p):
-    'multOperator : TIMES'
-    p[0] = '*'
-
-def p_multOperator_2(p):
-    'multOperator : DIVIDE'
-    p[0] = '/'
-
-def p_factor_1(p):
-    'factor : ID'
-    p[0] = ('id', p[1])
-
-def p_factor_2(p):
-    'factor : REAL'
-    p[0] = ('real', p[1])
-
-def p_factor_3(p):
-    'factor : INTEGER'
-    p[0] = ('integer', p[1])
-
-def p_factor_4(p):
-    'factor : LPAREN expression RPAREN'
-    p[0] = p[2]
-
-def p_factor_5(p):
-    'factor : NUMBER'
-    p[0] = ('number', p[1])
-
-def p_factor_6(p):
-    'factor : BOOLEAN'
-    p[0] = ('boolean', p[1])
-
-def p_empty(p):
-    'empty :'
-    p[0] = None
-
-# ERROS
+#  ---------------------------------------------------------------
+#  PROGRAMA
+#  ---------------------------------------------------------------
+
+def p_programa_0(p):
+	'programa : funcionlista'
+	p[0] = p[1]
+
+#  ---------------------------------------------------------------
+#  LISTA DE FUNCIONES
+#  ------------------------------------------newtype('int')---------------------
+
+def p_funcionlista_1(p):
+	'''funcionlista : funcion'''
+	p[0] = Node('programa',[p[1]])
+
+def p_funcionlista_2(p):
+	'''funcionlista : funcionlista funcion'''
+	p[1].append(p[2])
+	p[0] = p[1]
+
+#  ---------------------------------------------------------------
+#  FUNCION
+#  ---------------------------------------------------------------
+
+def p_funcion(p):
+	'funcion : fundecl ID PARI argumento PARD locales BEGIN lineas END'
+	p[0] = Node( 'funcion', [p[4], p[6], p[8]], p[2] )
+	# Elimina la tabla de simbolos actual, y restaura la anterior.
+	pop_scope()
+
+def p_fundecl(p):
+	'fundecl : FUN'
+	# Crea una nueva tabla de simbolos
+	new_scope()
+
+#  ---------------------------------------------------------------
+#  ARGUMENTO
+#  ---------------------------------------------------------------
+
+def p_argumento_0(p):
+	'argumento : vacio'
+	p[0] = Node( 'argumento()' )
+
+def p_argumento_1(p):
+	'argumento : declaracion'
+	p[0] = p[1]
+
+#  ---------------------------------------------------------------
+#  DECLARACIONES
+#  ---------------------------------------------------------------
+
+def p_declaracion_0(p):
+	'declaracion : dec'
+	p[0] = Node( 'argumento', [p[1]] )
+
+def p_declaracion_1(p):
+	'declaracion : declaracion COMA dec'
+	p[1].append(p[3])
+	p[0] = p[1]
+
+#  ---------------------------------------------------------------
+#  LOCALES
+#  ---------------------------------------------------------------
+
+def p_locales_0(p):
+	'locales : loclist PCOMA'
+	p[0] = p[1]
+
+def p_locales_1(p):
+	'locales : vacio'
+	p[0] = Node('locales')
+
+#  ---------------------------------------------------------------
+#  LOCLIST
+#  ---------------------------------------------------------------
+
+def p_loclist_0(p):
+	'loclist : loc'
+	p[0] = Node( 'loclist_dec', [p[1]] )
+	p[0].name = p[1].name
+
+def p_loclist_2(p):
+	'loclist : loclist PCOMA loc'
+	p[1].append(p[3])
+	p[0] = p[1]
+
+#  ---------------------------------------------------------------
+#  LOC
+#  ---------------------------------------------------------------
+
+def p_loc_0(p):
+	'loc : dec'
+	p[0] = p[1]
+
+def p_loc_1(p):
+	'loc : funcion'
+	p[0] = p[1]
+
+#  ---------------------------------------------------------------
+#  DEC
+#  ---------------------------------------------------------------
+
+def p_dec(p):
+	'dec : ID DPUN type'
+	p[0] = Node( 'declaracion', [p[3]], p[1] )
+
+	p[0].name = p[1]
+	p[0].value = p[1]
+	p[0].typ = p[3].typ
+	a = setid( p[0].name, p[3].typ )
+	if not a :
+		dir ( p[0] )
+		print ( ">>ERROR: redeclaracion del identificador '%s'" % (p[0].name) )
+
+
+#  ---------------------------------------------------------------
+#  LINEAS
+#  ---------------------------------------------------------------
+
+def p_lineas_0(p):
+	'lineas : linea'
+	p[0] = Node('lineas', [p[1]])
+
+def p_lineas_1(p):
+	'lineas : lineas PCOMA linea'
+	p[1].append(p[3])
+	p[0] = p[1]
+
+#  ---------------------------------------------------------------
+#  LINEA
+#  ---------------------------------------------------------------
+
+def p_linea_0(p):
+	'linea : expre'
+	p[0] = Node( 'expre', [p[1]] )
+
+def p_linea_1(p):
+	'linea : WRITE PARI expre PARD'
+	p[0] = Node( 'write', [p[3]] )
+
+def p_linea_2(p):
+	'linea : READ PARI location PARD'
+	p[0] = Node( 'read', [p[3]] )
+
+def p_linea_3(p):
+	'linea : PRINT PARI STRING PARD'
+	p[0] = Node( 'print', [], p[3] )
+
+def p_linea_4(p):
+	'linea : ID ASIG expre'
+	p[0] = Node( ':=', [p[3]], p[1] )
+
+	p[0].assign = 1
+
+	# Validacion id no declarado.
+	data = find_id( p[1] )
+	if not data :
+		print ( ">>ERROR: identificador '%s' no declarada." % p[1] )
+
+	# Comprobacion asignacion de tipo
+	p1 = get_id( p[1] )
+	typ = comparate_types(p1, p[3])
+	if typ == 'error' :
+		print( ">>ERROR: Se esperaban expresiones del mismo tipo. linea: ")
+
+def p_linea_5(p):
+	'linea : RETURN expre'
+	p[0] = Node( 'return', [p[2]], p[1] )
+
+def p_linea_7(p):
+	'linea : SKIP'
+	p[0] = Node( 'skip', [p[1]] )
+
+def p_linea_8(p):
+	'linea : BREAK'
+	p[0] = Node( 'break', [], p[1] )
+
+def p_linea_9(p):
+	'linea : WHILE relacion DO linea'
+	p[0] = Node( 'while', [p[2], p[4]] )
+
+def p_linea_10(p):
+	'linea : IF relacion THEN linea else_r'
+	p[0] = Node( 'if', [p[2], p[4], p[5]] )
+
+def p_linea_11(p):
+	'linea : BEGIN lineas END'
+	p[0] = p[2]
+
+#  ---------------------------------------------------------------
+#  ELSE
+#  ---------------------------------------------------------------
+
+def p_else_0(p):
+	'else_r : ELSE linea'
+	p[0] = Node( 'else', [p[2]] )
+
+def p_else_1(p):
+	'else_r : vacio'
+	p[0] = Node( 'else' )
+
+#  ---------------------------------------------------------------
+#  LOCATION
+#  ---------------------------------------------------------------
+#  bug detectado!!! no entra nunca por aki la funcion read coje id en ves de alguna de estas
+
+def p_location_1(p):
+	'location : ID'
+	p[0] = Node('id',[],p[1])
+	p[0].name = p[1]
+	p[0].value = p[1]
+
+	# Validacion id no declarado.
+	data = find_id( p[1] )
+	if not data :
+		print ( ">>ERROR: identificador '%s' no declarada." % p[1] )
+
+
+def p_location_2(p):
+	'location : ID CORI expre CORD'
+	p[0] = Node('array',[p[3]],p[1])
+
+	# Tipo del id
+	typ = find_type(p[1])
+	try:
+		p[0].typ = (typ[0], p[3].value)
+	except AttributeError:
+		p[0].typ= (typ[0], "unknow")
+		pass
+	p[0].value = p[1]
+
+	# Indices enteros
+	if hasattr(p[3],'typ'):
+		if p[3].typ[0] != 'int':
+			print (">>ERROR:  El indice del array %s debe ser un valor entero" % typ[0])
+
+	# Validacion id no declarado.
+	data = find_id( p[1] )
+	if not data :
+		print ( ">>ERROR: identificador '%s' no declarada." % p[1] )
+
+
+#  ---------------------------------------------------------------
+#  RELACION
+#  ---------------------------------------------------------------
+
+def p_relacion(p):
+	"""relacion : expre LT expre
+				| expre LE expre
+				| expre GT expre
+				| expre GE expre
+				| expre EQ expre
+				| expre NE expre
+	"""
+	p[0] = Node(p[2], [p[1], p[3]])
+	typ = comparate_types(p[1], p[3])
+	p[0].typ = typ
+	if typ == 'error' :
+		print( ">>ERROR: Se esperaban relaciones del mismo tipo.")
+
+def p_relacion_1(p):
+	"""relacion : relacion AND relacion
+				| relacion OR relacion
+	"""
+	p[0] = Node(p[2], [p[1],p[3]])
+
+def p_relacion_not(p):
+	'relacion : NOT relacion'
+	p[0] = Node('not',[p[2]])
+
+def p_relacion_parent(p):
+	'relacion : PARI relacion PARD'
+	p[0] = Node('relacion',[p[2]])
+
+#  ---------------------------------------------------------------
+#  TYPE
+#  ---------------------------------------------------------------
+
+def p_type_f(p):
+	'type : FLOAT'
+	p[0] = Node('type_float',[], p[1])
+	p[0].typ = ("float", None)
+
+def p_type_i(p):
+	'type : INT'
+	p[0] = Node('type_int',[],p[1])
+	p[0].typ = ("int", None)
+
+def p_type_fa(p):
+	'type : FLOAT CORI expre CORD'
+	p[0] = Node('type_float_Array', [p[3]])
+	try:
+		p[0].typ= ("float", p[3].value)
+	except AttributeError:
+		p[0].typ= ("float", "unknow")
+		pass
+
+
+def p_type_ia(p):
+	'type : INT CORI expre CORD'
+	p[0] = Node('type_int_Array', [p[3]])
+	try:
+		p[0].typ= ("int", p[3].value)
+	except AttributeError:
+		p[0].typ= ("int", "unknow")
+		pass
+
+#  ---------------------------------------------------------------
+#  EXPRLIST
+#  ---------------------------------------------------------------
+
+def p_exprelist_coma(p):
+	'exprelist : exprelist COMA expre'
+	p[1].append(p[3])
+	p[0] = p[1]
+
+def p_exprelist_(p):
+	'exprelist : expre'
+	p[0] = p[1]
+# y las funciones sin parametros hay exprelist vacias ????''
+	
+#  ---------------------------------------------------------------
+#  EXPRE
+#  ---------------------------------------------------------------
+
+def p_expre(p):
+	"""expre : expre MAS expre
+			 | expre MENOS expre
+			 | expre MUL expre
+			 | expre DIV expre
+	"""
+	p[0]= Node(p[2], [p[1], p[3]])
+	typ = comparate_types(p[1], p[3])
+	p[0].typ = typ
+	if typ == 'error' :
+		print( ">>ERROR: Se esperaban expresiones del mismo tipo.")
+ 
+def p_expre_menosu(p):
+	'expre : MENOS expre'
+	p[0]= Node('umenos',[p[2]])
+	p[0].typ = p[2].typ
+
+def p_expre_masu(p):
+	'expre : MAS expre'
+	p[0]= Node('umas',[p[2]])
+	p[0].typ = p[2].typ
+
+def p_expre_call(p):
+	'expre : ID PARI exprelist PARD'
+	p[0] = Node( 'call', [p[3]], p[1] )
+
+	typ = find_type(p[1])
+	try:
+		p[0].typ = (typ[0], p[3].value)
+	except AttributeError:
+		p[0].typ= (typ[0], "unknow")
+		pass
+
+def p_expre_id(p):
+	'expre : ID'
+	p[0] = Node('id', [], p[1])
+	p[0].value = p[1]
+	
+	# Validacion id no declarado.
+	data = find_id( p[1] )
+	if not data :
+		print ( ">>ERROR: identificador '%s' no declarada. Linea" % p[1] )
+ 
+	# tipo de dato
+	typ = find_type(p[1])
+	if typ :
+		p[0].typ = typ
+
+
+def p_expre_array(p):
+	'expre : ID CORI expre CORD'
+	p[0] = Node('array',[p[3]],p[1])
+
+	typ = find_type(p[1])
+	try:
+		p[0].typ = (typ[0], p[3].value)
+	except AttributeError:
+		p[0].typ= (typ[0], "unknow")
+		pass
+
+	# indices enteros
+	if hasattr(p[3],'typ') & hasattr(p[3],'value'):
+		if p[3].typ != 'int':
+			print (">>ERROR:  El indice del array %s debe ser un valor entero" % typ[0])
+	
+
+
+def p_expre_fnum(p):
+	'expre : FNUM'
+	p[0]= Node('numero_f',[], p[1])
+	p[0].value = p[1]
+	p[0].typ = ("float", None)
+
+def p_expre_inum(p):
+	'expre : INUM'
+	p[0]= Node('numero',[],p[1])
+	p[0].value = p[1]
+	p[0].typ = ("int", None)
+
+def p_expre_cast_int(p):
+	'expre : INT PARI expre PARD'
+	p[0] = Node('cast_int',[p[3]],p[1])
+	p[0].value = p[3].value
+	p[0].typ = ("int", None)
+
+
+def p_expre_cast_float(p):
+	'expre : FLOAT PARI expre PARD'
+	p[0] = Node('cast_float',[p[3]],p[1])
+	p[0].value = p[3].value
+	p[0].typ = ("float", None)
+
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+#  PARSER
+# -----------------------------------------------------------------------------
+
+#Regla vacio
+def p_vacio(p):
+	'vacio :'
+	pass
+
+# Error rule for syntax errors
 def p_error(p):
-    if TEST_ERROR:
-        if p is not None:
-            print("Context Error: '%s'" % (str(p.value)))
-            print("   -> Sintax Error! Line: '%s'" % (str(p.lexer.lineno)))
-        else:
-            print("   -> Lexer Error! Line: '%s'" % uLexico.lexer.lineno)
-    else:
-        raise Exception('Syntax', 'Error')
+    print ("Syntax error in input! Near '%s' line: %s" % (p.value,p.lineno))
 
-# Suponemos que lexer y parser están definidos y configurados aquí
 
-parser = yacc.yacc()
-
-def test_lexer(data):
-    """ Ejecuta el lexer y retorna la lista de tokens generados a partir del string de entrada como string. """
-    lexer.input(data)
+def test_pascal_lexer(input_string):
+    """Ejecuta el lexer sobre el string de entrada y recopila los valores de los tokens generados."""
+    lexer.input(input_string)
     tokens = []
     for tok in lexer:
-        tokens.append(f"type={tok.type}, value={tok.value}, lineno={tok.lineno}, pos={tok.lexpos}")
-    return '\n'.join(tokens)
+        tokens.append(tok.value)
+    return tokens
 
-def test_parser(data):
-    """ Ejecuta el parser sobre los datos y retorna el resultado del análisis sintáctico como string. """
-    result = parser.parse(data, lexer=lexer)
-    return str(result) if result else "No valid AST generated."
+def test_pascal_parser(data):
+    parser = yacc.yacc(debug=True)
+    try:
+        res = parser.parse(data)
+    except EOFError:
+        res = None
+    return res
 
-def print_ast(node, level=0):
-    """ Construye y retorna una representación en cadena del AST con sangría para mostrar la estructura. """
-    indent = "  " * level
-    result = ""
-    
-    if isinstance(node, dict):
-        node_type = node.get('type', 'Unknown')
-        node_info = node.get('info', 'None')
-        result += f"{indent}{node_type} (Info: {node_info})\n"
-        children = node.get('children', [])
-        for child in children:
-            result += print_ast(child, level + 1)
-    elif isinstance(node, list):
-        for child in node:
-            result += print_ast(child, level)
+ 
+def run_pascal_tests(input_string):
+    """ Ejecuta todas las pruebas: lexing, parsing y la impresión del AST, y retorna los resultados concatenados en un solo string. """
+    # Realiza el análisis léxico
+    lexer_results = test_pascal_lexer(input_string)
+    # Realiza el análisis sintáctico
+    parser_results = test_pascal_parser(input_string)
+    # Genera la representación AST si el parsing fue exitoso
+    if parser_results:
+        ast_representation = dump_tree(parser_results)
     else:
-        result += f"{indent}- {node}\n"
-    return result
+        ast_representation = "No valid AST generated or parser error."
 
-def run_tests(data):
-    """ Ejecuta tests para lexer y parser, e imprime los resultados incluyendo la representación del AST si está disponible. """
-    results = []
-    results.append("----- Testing Lexer -----\n")
-    lexer_results = test_lexer(data)
-    results.append(lexer_results)
+    # Concatena los resultados en un solo string
+    final_results = f"Lexer Pascal Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
+    return final_results
 
-    results.append("\n----- Testing Parser -----\n")
-    parser_result = test_parser(data)
-    results.append(parser_result)
 
-    if parser_result != "No valid AST generated.":
-        results.append("\n----- AST Representation -----\n")
-        ast_representation = print_ast(parser_result)
-        results.append(ast_representation)
-    else:
-        results.append("\nNo valid AST generated.\n")
-
-    return '\n'.join(results)
