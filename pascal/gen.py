@@ -3,8 +3,6 @@ listaf = []
 pilavalores = []
 
 def generate(file, top):
-    print("! Creado por mpascal.py", file=file)
-    print("! Daniel Bernal Jona Alvarez, IS744 (2012-2)", file=file)
     emit_program(file, top)
     anexo_get_expr(top)
 
