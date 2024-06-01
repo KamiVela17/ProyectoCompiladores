@@ -130,8 +130,10 @@ def run_js_tests(input_string):
     parser_results = test_js_parser(input_string)
     if parser_results:
         ast_representation = print_js_ast(parser_results)
+        if ast_representation:
+               semantic = analyze(parser_results, names)
     else:
         ast_representation = "No valid AST generated or parser error."
     
-    final_results = f"Lexer JavaScript Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
+    final_results = f"Lexer JavaScript Output:\n{lexer_results}\n\nAST Representation:\n\n{ast_representation}\n\nSemantic Analysis:\n{semantic}"
     return final_results
