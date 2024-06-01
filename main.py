@@ -3,7 +3,6 @@ from tkinter import ttk
 from tkinter import filedialog as tkFileDialog, scrolledtext as tkScrolledText
 import os
 from PIL import Image, ImageTk
-
 # Importando funciones adicionales de los módulos
 from hypertext.parser import run_html_tests
 from cplusplus.parser import run_cpp_tests
@@ -15,7 +14,7 @@ from sql.parser import run_sql_tests
 class Application(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Proyecto Final")
+        self.title("Predator Compiler")
         self.configure(bg='#202020')
 
         self.main_frame = tk.Frame(self, bg='#202020')
@@ -26,16 +25,16 @@ class Application(tk.Tk):
 
         self.load_logo()
 
-        self.title_label = tk.Label(self.right_frame, text="Proyecto Final", font=("Helvetica", 16, "bold"), bg='#202020', fg='white')
+        self.title_label = tk.Label(self.right_frame, text="Predator Compiler", font=("Helvetica", 16, "bold"), bg='#202020', fg='white')
         self.title_label.pack(pady=(10, 10))
 
         self.instructions_label = tk.Label(self.right_frame, text="Seleccione un archivo para analizar:", font=("Helvetica", 10), bg='#202020', fg='white')
         self.instructions_label.pack(pady=(0, 20))
 
-        self.boton_analizar = ttk.Button(self.right_frame, text="Seleccionar Archivo", command=self.seleccionar_archivo_y_analizar, style='TButton')
+        self.boton_analizar = ttk.Button(self.right_frame, text="Seleccionar archivo", command=self.seleccionar_archivo_y_analizar, style='TButton')
         self.boton_analizar.pack(pady=(0, 10), ipadx=10, ipady=5)
 
-        self.boton_adivinar = ttk.Button(self.right_frame, text="Analizar Texto", command=self.abrir_nueva_ventana, style='TButton')
+        self.boton_adivinar = ttk.Button(self.right_frame, text="Analizar texto", command=self.abrir_nueva_ventana, style='TButton')
         self.boton_adivinar.pack(pady=(10, 20), ipadx=10, ipady=5)
 
         self.minsize(500, 300)
@@ -44,7 +43,7 @@ class Application(tk.Tk):
     def load_logo(self):
         logo_path = os.path.join(os.path.dirname(__file__), 'icono.png')
         img = Image.open(logo_path)
-        img = img.resize((100, 100), Image.LANCZOS)
+        img = img.resize((250, 175), Image.LANCZOS)
         photo = ImageTk.PhotoImage(img)
         self.logo_label = tk.Label(self.right_frame, image=photo, bg='#202020')
         self.logo_label.image = photo
@@ -65,7 +64,7 @@ class Application(tk.Tk):
 
     def abrir_nueva_ventana(self):
         new_window = tk.Toplevel(self)
-        new_window.title("Analizar Texto")
+        new_window.title("Analizar texto")
         new_window.configure(bg='black')
         new_window.geometry("600x400")
 
@@ -84,7 +83,7 @@ class Application(tk.Tk):
         analyze_button = ttk.Button(button_frame, text="Analizar", command=lambda: self.analizar_texto(text_area.get("1.0", tk.END)), style='TButton')
         analyze_button.pack(side=tk.RIGHT, padx=10, pady=10)
 
-        clear_button = ttk.Button(button_frame, text="Limpiar Pantalla", command=lambda: text_area.delete('1.0', tk.END), style='TButton')
+        clear_button = ttk.Button(button_frame, text="Limpiar pantalla", command=lambda: text_area.delete('1.0', tk.END), style='TButton')
         clear_button.pack(side=tk.RIGHT, padx=10, pady=10)
 
     def identificar_lenguaje_por_extension(self, extension, content):
