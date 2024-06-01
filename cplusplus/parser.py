@@ -620,8 +620,10 @@ def run_cpp_tests(input_string):
     parser_result = test_cpp_parser(input_string)
     if parser_result:
         ast_representation = print_cpp_ast(parser_result)
+        semantic = SemanticAnalyzer() 
+        semantic.analyze(ast_representation) 
     else:
         ast_representation = "No valid AST generated or parser error."
     
-    final_results = f"Lexer C++ Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}"
+    final_results = f"Lexer C++ Output:\n{lexer_results}\n\nAST Representation:\n{ast_representation}\n\nSemantic Analysis:\n{semantic.get_results()}"
     return final_results

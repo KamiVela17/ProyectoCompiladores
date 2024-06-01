@@ -47,10 +47,8 @@ class SemanticAnalyzer:
         self.analyze(left_expr)
         self.analyze(right_expr)
 
-    def print_results(self):
+    def get_results(self):
         if not self.errors:
-            print("Análisis Semántico completado sin errores.")
+            return "Análisis Semántico completado sin errores."
         else:
-            for error in self.errors:
-                print(error)
-
+            return "\n".join(self.errors)
